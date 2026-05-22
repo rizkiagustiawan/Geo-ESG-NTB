@@ -117,22 +117,34 @@ fn validate_data_quality(
 }
 
 fn main() {
-    let data_str =
-        fs::read_to_string("../shared_data/raw_data.json").expect("Gagal membaca JSON");
-    let sites: Vec<SiteData> = serde_json::from_str(&data_str).expect("Gagal parsing JSON");
+    let args: Vec<String> = std::env::args().collect();
+    
+    // Default paths
+    let default_input = "../shared_data/raw_data.json".to_string();
+    let default_output = "../shared_data/esg_metrics.json".to_string();
+    
+    // Use arguments if provided: [1] = input, [2] = output
+    let input_path = args.get(1).unwrap_or(&default_input);
+    let output_path = args.get(2).unwrap_or(&default_output);
+
+    println!("📖 Reading from: {}", input_path);
+    let data_str = fs::read_to_string(input_path)
+        .unwrap_or_else(|_| panic!("Gagal membaca JSON dari {}", input_path));
+    
+    let sites: Vec<SiteData> = serde_json::from_str(&data_str)
+        .expect("Gagal parsing JSON");
+    
     let mut reports: Vec<ESGReport> = Vec::new();
 
     for site in sites {
         let (re_pct, bias, accuracy_pct, tier, integrity) =
             validate_data_quality(site.estimated_biomass, site.ground_truth_10);
 
-        // GRI 304 disclosure text (factual, not a score)
         let gri_text = format!(
             "Akurasi biomassa {:.1}% (RE={:.1}%, Bias={:+.1} Mg/ha) — Tier: {}",
             accuracy_pct, re_pct, bias, tier
         );
 
-        // Backward-compatible trust score = accuracy as fraction (0-1)
         let trust = accuracy_pct / 100.0;
 
         reports.push(ESGReport {
@@ -150,12 +162,14 @@ fn main() {
     }
 
     let out_str = serde_json::to_string_pretty(&reports).unwrap();
-    if fs::write("../shared_data/esg_metrics.json", out_str).is_ok() {
-        println!("✅ ESG Metrics (IPCC-validated) ditulis ke: ../shared_data/esg_metrics.json");
+    
+    println!("✍️ Writing to: {}", output_path);
+    if fs::write(output_path, out_str).is_ok() {
+        println!("✅ ESG Metrics (IPCC-validated) sukses.");
     } else {
-        eprintln!("❌ Gagal menulis file.");
+        eprintln!("❌ Gagal menulis ke {}.", output_path);
+        std::process::exit(1);
     }
-    println!("✅ Tahap 2: Rust ESG Engine — Data Quality Assessment selesai!");
 }
 
 #[cfg(test)]

@@ -28,6 +28,7 @@ import threading
 from functools import partial
 from typing import List, Optional
 
+from pipeline_core import run_full_pipeline
 from fastapi import FastAPI, HTTPException, Request, Depends, status, Body
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -159,119 +160,7 @@ def rate_limit(request: Request):
     else:
         RATE_LIMIT_DB[client_ip] = [current_time]
 
-
-# ─── Pipeline Execution (Thread-Safe) ────────────────────────────────────────
-_rust_lock = threading.Lock()  # Serialisasi akses ke Rust binary (shared I/O)
-
-def _run_pipeline_sync(user_inputs: list) -> tuple:
-    """
-    Menjalankan pipeline Python→Rust di isolated temp directory.
-    Thread-safe: setiap request mendapat copy shared_data sendiri.
-
-    Returns: (raw_data_list, esg_metrics_list)
-    """
-    request_id = str(uuid.uuid4())[:8]
-    work_dir = os.path.join(BASE_DIR, "shared_data", f".tmp_{request_id}")
-
-    try:
-        os.makedirs(work_dir, exist_ok=True)
-
-        # Copy data yang diperlukan ke work dir
-        geojson_src = os.path.join(SHARED_DATA, "batas_ntb.geojson")
-        if os.path.exists(geojson_src):
-            shutil.copy2(geojson_src, os.path.join(work_dir, "batas_ntb.geojson"))
-
-        # Tulis user input ke work dir (isolated, no race condition)
-        user_input_path = os.path.join(work_dir, "user_input.json")
-        raw_data_path = os.path.join(work_dir, "raw_data.json")
-        esg_metrics_path = os.path.join(work_dir, "esg_metrics.json")
-
-        with open(user_input_path, "w") as f:
-            json.dump(user_inputs, f, indent=4)
-
-        # ── Step 1: Jalankan Python Extractor ────────────────────────
-        # Override paths via environment variables
-        env = os.environ.copy()
-        env["GEOESG_OUTPUT_PATH"] = raw_data_path
-        env["GEOESG_INPUT_PATH"] = user_input_path
-        env["GEOESG_GEOJSON_PATH"] = os.path.join(work_dir, "batas_ntb.geojson")
-
-        extractor_path = os.path.join(BASE_DIR, "python-gee-ai", "extractor.py")
-        venv_python = os.path.join(BASE_DIR, "venv", "bin", "python3")
-        python_exe = venv_python if os.path.exists(venv_python) else "python3"
-        result_py = subprocess.run(
-            [python_exe, extractor_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=BASE_DIR,
-            env=env,
-        )
-        if result_py.returncode != 0:
-            print(f"⚠️ [{request_id}] Extractor stderr: {result_py.stderr}")
-
-        # Fallback: jika extractor tidak mendukung env vars, cek path standar
-        if not os.path.exists(raw_data_path):
-            fallback_raw = os.path.join(SHARED_DATA, "raw_data.json")
-            if os.path.exists(fallback_raw):
-                shutil.copy2(fallback_raw, raw_data_path)
-
-        # ── Step 2: Jalankan Rust ESG Engine ─────────────────────────
-        rust_binary = os.path.join(
-            BASE_DIR, "rust-esg-engine", "target", "release", "rust-esg-engine"
-        )
-
-        # Rust binary membaca ../shared_data/raw_data.json secara hardcoded.
-        # Kita gunakan threading Lock untuk memastikan hanya satu request
-        # yang menulis + menjalankan Rust pada satu waktu.
-        standard_raw = os.path.join(SHARED_DATA, "raw_data.json")
-        standard_esg = os.path.join(SHARED_DATA, "esg_metrics.json")
-
-        with _rust_lock:
-            shutil.copy2(raw_data_path, standard_raw)
-
-            if os.path.exists(rust_binary):
-                result_rs = subprocess.run(
-                    [rust_binary],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd=os.path.join(BASE_DIR, "rust-esg-engine"),
-                )
-            else:
-                result_rs = subprocess.run(
-                    ["cargo", "run", "--release", "-q"],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    cwd=os.path.join(BASE_DIR, "rust-esg-engine"),
-                )
-
-            if result_rs.returncode != 0:
-                print(f"⚠️ [{request_id}] Rust stderr: {result_rs.stderr}")
-
-            # Copy esg_metrics back to isolated work dir
-            if os.path.exists(standard_esg):
-                shutil.copy2(standard_esg, esg_metrics_path)
-
-        # ── Step 3: Baca Hasil ───────────────────────────────────────
-        with open(raw_data_path, "r") as f:
-            raw_data = json.load(f)
-        with open(esg_metrics_path, "r") as f:
-            esg_metrics = json.load(f)
-
-        return raw_data, esg_metrics
-
-    finally:
-        # Cleanup temp directory
-        if os.path.exists(work_dir):
-            shutil.rmtree(work_dir, ignore_errors=True)
-
-
-async def run_pipeline(user_inputs: list) -> tuple:
-    """Async wrapper — jalankan pipeline di thread pool agar tidak blokir event loop."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, partial(_run_pipeline_sync, user_inputs))
+# ─── Routes ──────────────────────────────────────────────────────────────────
 
 
 def build_report_markdown(site_id, site_raw, site_esg, ground_truth_biomass):
@@ -409,7 +298,8 @@ async def generate_esg_report(req: AuditRequest):
             {"site_id": req.site_id, "ground_truth_10": req.ground_truth_biomass}
         ]
 
-        raw_data, esg_metrics = await run_pipeline(user_inputs)
+        loop = asyncio.get_event_loop()
+        raw_data, esg_metrics = await loop.run_in_executor(None, run_full_pipeline, user_inputs)
 
         # Cari data untuk site yang diminta
         site_raw = next(
@@ -424,11 +314,17 @@ async def generate_esg_report(req: AuditRequest):
             req.site_id, site_raw, site_esg, req.ground_truth_biomass
         )
 
-        # Log ke PostgreSQL
-        conn = get_db()
-        log_audit(conn, req.site_id, site_raw, site_esg, req.ground_truth_biomass)
-        conn.commit()
-        conn.close()
+        # Log ke PostgreSQL (Non-blocking)
+        def _log_db():
+            try:
+                conn = get_db()
+                log_audit(conn, req.site_id, site_raw, site_esg, req.ground_truth_biomass)
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"DB Log Error: {e}")
+
+        await loop.run_in_executor(None, _log_db)
 
         return JSONResponse(
             content={
@@ -558,6 +454,9 @@ async def generate_esg_batch(req: BatchAuditRequest):
     except ImportError:
         raise HTTPException(status_code=503, detail="Celery/Redis tidak tersedia. Jalankan docker-compose up.")
     except Exception as e:
+        err_str = str(e).lower()
+        if "redis" in err_str or "celery" in err_str or "connection refused" in err_str or "kombu" in err_str:
+            raise HTTPException(status_code=503, detail="Celery/Redis tidak tersedia. Jalankan docker-compose up.")
         raise HTTPException(status_code=500, detail=f"Batch error: {str(e)}")
 
 

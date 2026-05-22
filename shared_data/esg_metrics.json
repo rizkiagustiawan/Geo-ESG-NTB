@@ -1,14 +1,14 @@
 [
   {
     "site_id": "Lombok Barat",
-    "relative_error_pct": 61.7,
-    "bias_mg_ha": -61.74,
-    "accuracy_pct": 38.3,
+    "relative_error_pct": 56.0,
+    "bias_mg_ha": -56.04,
+    "accuracy_pct": 44.0,
     "ipcc_tier": "Unacceptable",
-    "data_integrity_flag": "AUDIT_FAIL: RE=61.7% > 30% — Melebihi batas toleransi IPCC. Kalibrasi ulang diperlukan.",
-    "gri_304_biodiversity_score": "Akurasi biomassa 38.3% (RE=61.7%, Bias=-61.7 Mg/ha) — Tier: Unacceptable",
-    "final_trust_score": 0.383,
-    "estimated_biomass": 38.26,
-    "estimated_carbon": 17.6
+    "data_integrity_flag": "AUDIT_FAIL: RE=56.0% > 30% — Melebihi batas toleransi IPCC. Kalibrasi ulang diperlukan.",
+    "gri_304_biodiversity_score": "Akurasi biomassa 44.0% (RE=56.0%, Bias=-56.0 Mg/ha) — Tier: Unacceptable",
+    "final_trust_score": 0.44,
+    "estimated_biomass": 43.96,
+    "estimated_carbon": 20.22
   }
 ]

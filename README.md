@@ -115,9 +115,9 @@ docker-compose up -d --build
 | `GET` | `/api/task-status/{id}` | Cek status batch task | — |
 | `GET` | `/api/audit-history` | Log audit PostgreSQL | — |
 | `POST` | `/api/generate-map/{site_id}` | Generate peta kartografi (single) | — |
-| `POST` | `/api/generate-all-maps` | Batch generate 9 peta NTB | — |
 | `GET` | `/api/maps` | List peta yang tersedia | — |
 | `GET` | `/api/maps/{filename}` | Download peta PNG | — |
+| `DELETE` | `/api/maps` | Hapus semua peta dari galeri | — |
 | `GET` | `/api/health` | Health check | — |
 
 ### Contoh Request
@@ -141,7 +141,7 @@ curl -X POST http://localhost:8000/generate-esg-batch \
   }'
 
 # Generate peta satu lokasi
-curl -X POST http://localhost:8000/api/generate-map/Lombok%20Barat -o peta.png
+curl -X POST http://localhost:8000/api/generate-map/Lombok%20Barat
 ```
 
 ---
@@ -151,7 +151,9 @@ curl -X POST http://localhost:8000/api/generate-map/Lombok%20Barat -o peta.png
 ```
 GeoESG-Final/
 ├── api_server.py              # FastAPI orchestrator (11 endpoints)
+├── pipeline_core.py           # Core pipeline logic (Race-condition safe)
 ├── worker.py                  # Celery async worker (batch processing)
+├── init_db.py                 # Skrip inisialisasi tabel PostGIS
 ├── index.html                 # Command Center UI (Leaflet + Chart.js + Map Gallery)
 ├── test_api.py                # Pytest suite
 ├── requirements.txt           # Python dependencies

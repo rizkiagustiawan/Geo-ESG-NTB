@@ -41,8 +41,9 @@ def init_gee():
             cred_dict = json.load(f)
         service_account = cred_dict["client_email"]
         credentials = ee.ServiceAccountCredentials(service_account, key_file=KEY_PATH)
-        ee.Initialize(credentials=credentials, project="thermal-cathode-421211")
-        print("✅ Koneksi Google Earth Engine berhasil!")
+        project_id = os.environ.get("GEE_PROJECT_ID", "thermal-cathode-421211")
+        ee.Initialize(credentials=credentials, project=project_id)
+        print(f"✅ Koneksi Google Earth Engine berhasil! (Project: {project_id})")
         return True
     except Exception as e:
         print(f"⚠️  GEE tidak tersedia ({e}), menggunakan mode fallback.")
@@ -505,11 +506,14 @@ def run_pipeline():
 
     # ─── Tahap 1.5: Cetak Peta Kartografi Otomatis ───────────────────
     try:
-        from map_printer import generate_all_maps, load_geojson
-        geojson_data = load_geojson()
-        if geojson_data:
-            print("\n🗺️  Memulai cetak peta otomatis untuk semua lokasi...")
-            generate_all_maps(geojson_data=geojson_data, raw_data_list=results)
+        # Cek jika jalan standalone (tidak via API/Celery yang mengatur output path)
+        is_standalone = os.environ.get("GEOESG_OUTPUT_PATH") is None
+        if is_standalone:
+            from map_printer import generate_all_maps, load_geojson
+            geojson_data = load_geojson()
+            if geojson_data:
+                print("\n🗺️  Memulai cetak peta otomatis untuk semua lokasi...")
+                generate_all_maps(geojson_data=geojson_data, raw_data_list=results)
     except Exception as e:
         print(f"⚠️  Cetak peta gagal (non-fatal): {e}")
 
