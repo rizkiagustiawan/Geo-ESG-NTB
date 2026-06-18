@@ -1,0 +1,4 @@
+PAPER: Wang_2024_Biomass_Estimation_S1_S2_ALOS_GEDI.pdf
+URL: https://www.mdpi.com/1999-4907/15/9/1576/pdf
+
+Could not download PDF automatically due to publisher bot-protection. Please download manually via browser.

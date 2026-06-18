@@ -1,0 +1,4 @@
+PAPER: Chen_2025_Tropical_Forest_Biomass_LiDAR_Sentinel.pdf
+URL: https://www.mdpi.com/2071-1050/15/5/4162/pdf
+
+Could not download PDF automatically due to publisher bot-protection. Please download manually via browser.
