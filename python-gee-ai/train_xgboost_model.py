@@ -29,45 +29,46 @@ print("  GeoESG — XGBoost Biomass Model Training")
 print("  Refs: Zhang (2025), Wang (2024), Zurqani (2025)")
 print("=" * 60)
 
-# ─── 1. Generate Science-Based Training Data ─────────────────────
-np.random.seed(42)
-n_samples = 10000
 
-print(f"[1/5] Generating {n_samples} training samples...")
+# ─── 1. Load Data: REAL GEDI L4A atau Sintetis ───────────────────
+import pandas as pd
+data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared_data", "gedi_groundtruth.csv")
 
-ndvi = np.random.uniform(0.10, 0.95, n_samples)
-c_vh = np.random.uniform(-25.0, -5.0, n_samples)
-c_vv = np.random.uniform(-15.0, -2.0, n_samples)
-l_hh = np.random.uniform(-15.0, -2.0, n_samples)
-l_hv = np.random.uniform(-25.0, -5.0, n_samples)
+if os.path.exists(data_path):
+    print(f"[1/5] 📡 Memuat REAL GEDI L4A Ground-Truth dari {data_path}...")
+    df = pd.read_csv(data_path)
+    X = df[['ndvi_obs', 'c_vh_obs', 'c_vv_obs', 'l_hh_obs', 'l_hv_obs']].values
+    y = df['agb_true'].values
+    data_source_label = "Real NASA GEDI L4A (Virtual Ground-Truth)"
+else:
+    print("[1/5] 🧪 Membangkitkan 10,000 sampel sintetis (Satelit GEDI belum diekstrak)...")
+    print("      💡 Tips: Jalankan 'python fetch_gedi_groundtruth.py' untuk data riil.")
+    np.random.seed(42)
+    n_samples = 10000
 
-# Allometric AGB model (Mitchard et al., 2012; Saatchi et al., 2011)
-# XGBoost can capture interaction terms that RF cannot
-ln_agb_true = (
-    5.00
-    + 0.10 * l_hv
-    + 0.03 * l_hh
-    + 0.05 * c_vh
-    + 2.00 * ndvi
-    + 0.02 * l_hv * ndvi  # interaction term
-)
+    ndvi = np.random.uniform(0.10, 0.95, n_samples)
+    c_vh = np.random.uniform(-25.0, -5.0, n_samples)
+    c_vv = np.random.uniform(-15.0, -2.0, n_samples)
+    l_hh = np.random.uniform(-15.0, -2.0, n_samples)
+    l_hv = np.random.uniform(-25.0, -5.0, n_samples)
 
-field_noise = np.random.normal(0, 0.15, n_samples)
-agb_true = np.exp(ln_agb_true + field_noise)
-agb_true = np.clip(agb_true, 1.0, 450.0)
+    ln_agb_true = (5.00 + 0.10 * l_hv + 0.03 * l_hh + 0.05 * c_vh + 2.00 * ndvi + 0.02 * l_hv * ndvi)
+    field_noise = np.random.normal(0, 0.15, n_samples)
+    agb_true = np.clip(np.exp(ln_agb_true + field_noise), 1.0, 450.0)
 
-# Sensor noise (ESA/JAXA specs)
-ndvi_obs = np.clip(ndvi + np.random.normal(0, 0.02, n_samples), -0.1, 1.0)
-c_vh_obs = c_vh + np.random.normal(0, 1.0, n_samples)
-c_vv_obs = c_vv + np.random.normal(0, 1.0, n_samples)
-l_hh_obs = l_hh + np.random.normal(0, 1.5, n_samples)
-l_hv_obs = l_hv + np.random.normal(0, 1.5, n_samples)
+    ndvi_obs = np.clip(ndvi + np.random.normal(0, 0.02, n_samples), -0.1, 1.0)
+    c_vh_obs = c_vh + np.random.normal(0, 1.0, n_samples)
+    c_vv_obs = c_vv + np.random.normal(0, 1.0, n_samples)
+    l_hh_obs = l_hh + np.random.normal(0, 1.5, n_samples)
+    l_hv_obs = l_hv + np.random.normal(0, 1.5, n_samples)
 
-X = np.column_stack((ndvi_obs, c_vh_obs, c_vv_obs, l_hh_obs, l_hv_obs))
-y = agb_true
+    X = np.column_stack((ndvi_obs, c_vh_obs, c_vv_obs, l_hh_obs, l_hv_obs))
+    y = agb_true
+    data_source_label = "Science-based synthetic (Mitchard 2012; Saatchi 2011)"
 
 print(f"  AGB range: {y.min():.1f} — {y.max():.1f} Mg/ha")
-print(f"  AGB mean:  {y.mean():.1f} +/- {y.std():.1f} Mg/ha\n")
+print(f"  AGB mean:  {y.mean():.1f} +/- {y.std():.1f} Mg/ha
+")
 
 # ─── 2. Train/Test Split ─────────────────────────────────────────
 X_train, X_test, y_train, y_test = train_test_split(
@@ -139,7 +140,7 @@ report = {
     "learning_rate": 0.05,
     "n_training_samples": len(X_train),
     "n_test_samples": len(X_test),
-    "training_data_source": "Science-based synthetic (Mitchard 2012; Saatchi 2011) + interaction terms",
+    "training_data_source": data_source_label,
     "validation_metrics": {
         "R2": round(r2, 4),
         "RMSE_Mg_ha": round(rmse, 2),
