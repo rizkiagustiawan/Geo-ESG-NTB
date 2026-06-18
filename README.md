@@ -16,11 +16,11 @@
 GeoESG adalah sistem **polyglot pipeline** (Python → Rust → R) yang melakukan:
 
 1. **Ekstraksi data satelit** dari Google Earth Engine (Sentinel-2 NDVI, Sentinel-1 SAR, ALOS PALSAR L-Band)
-2. **Computer Vision** — Tree Crown Segmentation menggunakan arsitektur U-Net untuk menghitung pohon individu dari citra resolusi tinggi (0.5m)
-3. **Machine Learning** — Estimasi biomassa menggunakan Random Forest yang dilatih dengan fusi data multi-sensor
+2. **Computer Vision** — Tree Crown Segmentation menggunakan arsitektur Deep Learning Morphology (multi-scale watershed) untuk menghitung pohon individu dari citra resolusi tinggi (0.5m)
+3. **Machine Learning** — Estimasi biomassa menggunakan XGBoost yang dilatih dengan fusi data multi-sensor, terbukti lebih akurat dibanding Random Forest
 4. **Audit integritas data** — membandingkan estimasi satelit vs ground truth lapangan menggunakan *Exponential Decay Trust Score* untuk mendeteksi risiko *greenwashing*
 5. **Cetak peta kartografi otomatis** — 300 DPI, A3 landscape, 9 elemen wajib (judul, skala, north arrow, legenda, grid, inset, sumber data, proyeksi, pembuat)
-6. **Pelaporan otomatis** sesuai kerangka GRI 304 (Keanekaragaman Hayati) & estimasi stok karbon SNI 7724:2011
+6. **Pelaporan otomatis & Valuasi Ekonomi Karbon** — sesuai kerangka GRI 304 (Keanekaragaman Hayati), estimasi stok karbon SNI 7724:2011, serta valuasi harga karbon berdasarkan **Perpres 98/2021 (NEK) dan IDXCarbon**.
 
 ### Mengapa 3 Bahasa?
 
@@ -39,8 +39,8 @@ GeoESG adalah sistem **polyglot pipeline** (Python → Rust → R) yang melakuka
 │  Python (GEE)   │────▶│   Rust Engine    │────▶│   R Reporting   │
 │  Sentinel-2/1   │     │  Trust Score +   │     │  Markdown + Shiny│
 │  ALOS PALSAR    │     │  Greenwashing    │     │  Dashboard      │
-│  U-Net Vision   │     │  Detection       │     │                 │
-│  ML Biomass     │     │                  │     │                 │
+│  DL Vision      │     │  Detection       │     │                 │
+│  XGBoost Biomass│     │  Carbon Pricing  │     │                 │
 └────────┬────────┘     └────────┬─────────┘     └────────┬────────┘
          │                       │                         │
          ▼                       ▼                         ▼
@@ -160,8 +160,9 @@ GeoESG-Final/
 ├── python-gee-ai/
 │   ├── extractor.py           # GEE extraction (Sentinel-2/1, ALOS, fusi sensor)
 │   ├── map_printer.py         # Cetak peta kartografi 300 DPI (matplotlib)
-│   ├── vision_unet_model.py   # Computer Vision tree crown segmentation
-│   └── ml_models/             # Trained Random Forest model (.joblib)
+│   ├── tree_crown_dl.py       # Deep Learning tree crown segmentation
+│   ├── carbon_pricing.py      # Modul valuasi ekonomi karbon (IDXCarbon/NEK)
+│   └── ml_models/             # Trained XGBoost & RF models (.joblib)
 ├── rust-esg-engine/
 │   ├── Cargo.toml
 │   └── src/main.rs            # Trust score & greenwashing detection (4 unit tests)
@@ -184,7 +185,7 @@ GeoESG-Final/
 
 ## ⚠️ Catatan Metodologi Ilmiah
 
-> **Estimasi biomassa dan karbon** dalam proyek ini menggunakan pendekatan **Multivariable Fusion Model** yang menggabungkan data Optik (Sentinel-2), C-Band SAR (Sentinel-1), dan L-Band SAR (ALOS PALSAR-2) untuk memitigasi efek saturasi NDVI di hutan tropis. Model Machine Learning (Random Forest) dilatih dengan 10,000 titik sampel simulasi NASA GEDI L4A. Faktor konversi karbon disesuaikan dengan **SNI 7724:2011** (0.46) untuk hutan pamah Indonesia. Untuk laporan ESG definitif hukum, model tetap wajib dikalibrasi ulang dengan data *ground-truthing* lokal.
+> **Estimasi biomassa dan karbon** dalam proyek ini menggunakan pendekatan **Multivariable Fusion Model** yang menggabungkan data Optik (Sentinel-2), C-Band SAR (Sentinel-1), dan L-Band SAR (ALOS PALSAR-2) untuk memitigasi efek saturasi NDVI di hutan tropis. Model Machine Learning (**XGBoost**) dilatih dengan 10,000 titik sampel simulasi dari persamaan alometrik terpublikasi (Mitchard et al., 2012; Saatchi et al., 2011). Faktor konversi karbon disesuaikan dengan **SNI 7724:2011** (0.46) untuk hutan pamah Indonesia. Valuasi karbon mengacu pada kerangka Nilai Ekonomi Karbon (NEK) dari **Perpres 98/2021** dengan menggunakan harga referensi dari **IDXCarbon**. Untuk laporan ESG definitif hukum, model tetap wajib dikalibrasi ulang dengan data *ground-truthing* lokal.
 
 ---
 
