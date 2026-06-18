@@ -197,8 +197,9 @@ GeoESG-Final/
 - **Frontend:** Vanilla HTML/CSS/JS, Leaflet.js, Chart.js
 - **Database:** PostgreSQL + PostGIS
 - **Kartografi:** matplotlib (300 DPI, A3 landscape)
-- **Computer Vision:** OpenCV (tree crown segmentation)
-- **ML:** scikit-learn (Random Forest biomass estimation)
+- **Computer Vision:** OpenCV (multi-scale watershed tree crown detection, DL-based)
+- **ML:** XGBoost (primary) + scikit-learn Random Forest (fallback) — biomass estimation
+- **Carbon Valuation:** IDXCarbon pricing (Perpres 98/2021 NEK framework)
 - **DevOps:** Docker multi-stage build, GitHub Actions CI/CD
 - **Data:** Sentinel-2 (optik), Sentinel-1 (SAR), ALOS PALSAR (L-Band), GeoJSON admin boundaries
 
