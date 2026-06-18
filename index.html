@@ -328,6 +328,28 @@
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '&copy; Esri', maxZoom: 18
         }).addTo(map);
+        L.control.scale({position: 'bottomleft', metric: true, imperial: false}).addTo(map);
+
+        // Add custom legend for NDVI
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.style.background = 'rgba(15, 23, 42, 0.9)';
+            div.style.color = '#e2e8f0';
+            div.style.padding = '10px';
+            div.style.borderRadius = '8px';
+            div.style.border = '1px solid #334155';
+            div.style.fontSize = '11px';
+            div.innerHTML = `
+                <strong style="display:block;margin-bottom:6px;color:#38bdf8;">Indeks NDVI</strong>
+                <div style="display:flex;align-items:center;margin-bottom:3px;"><i style="background:#10b981;width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:2px;"></i> &ge; 0.70 (Sehat)</div>
+                <div style="display:flex;align-items:center;margin-bottom:3px;"><i style="background:#f59e0b;width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:2px;"></i> 0.40 - 0.69 (Sedang)</div>
+                <div style="display:flex;align-items:center;margin-bottom:3px;"><i style="background:#ef4444;width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:2px;"></i> &lt; 0.40 (Kritis)</div>
+                <div style="display:flex;align-items:center;"><i style="background:rgba(56,189,248,0.1);border:1px dashed #38bdf8;width:12px;height:12px;display:inline-block;margin-right:6px;border-radius:2px;"></i> Belum Diaudit</div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
 
         let geojsonLayer, myChart, myTrendChart;
         let lastMetrics = null;
@@ -424,7 +446,45 @@
                     onEachFeature: (feat, layer) => {
                         const name = feat.properties.ADM2_NAME || feat.properties.NAMOBJ || 'Unknown';
                         siteData[name] = { poly: layer };
-                        layer.bindPopup(`<b style="font-size:14px;">${name}</b><br><span style="color:#94a3b8;">Belum diaudit</span>`);
+                        
+                        // Buat elemen popup dengan tombol aksi
+                        const popupContent = `
+                            <div style="text-align:center;">
+                                <b style="font-size:14px; color:#1e293b;">${name}</b><br>
+                                <span style="color:#64748b; font-size:12px;">Belum diaudit</span><br>
+                                <button onclick="document.getElementById('siteSelector').value='${name}'; document.getElementById('auditBtn').click();" 
+                                    style="margin-top:8px; background:#38bdf8; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">
+                                    🚀 Audit Sekarang
+                                </button>
+                            </div>
+                        `;
+                        layer.bindPopup(popupContent);
+                        
+                        // Tambahkan interaktivitas hover dan klik
+                        layer.on({
+                            mouseover: (e) => {
+                                const l = e.target;
+                                l.setStyle({ fillOpacity: 0.3, weight: 2.5, color: '#0ea5e9' });
+                                l.bringToFront();
+                            },
+                            mouseout: (e) => {
+                                geojsonLayer.resetStyle(e.target);
+                                // Restore style if already audited
+                                if (lastMetrics && lastMetrics.site_id === name) {
+                                    const pass = lastMetrics.data_integrity_flag?.includes('PASS');
+                                    const ndvi = lastMetrics.satellite_ndvi_90 || 0;
+                                    let polyColor = '#10b981';
+                                    if (ndvi < 0.4) polyColor = '#ef4444';
+                                    else if (ndvi < 0.7) polyColor = '#f59e0b';
+                                    l.setStyle({ color: polyColor, fillColor: polyColor, fillOpacity: 0.6, weight: 2.5, dashArray: '' });
+                                }
+                            },
+                            click: (e) => {
+                                sel.value = name;
+                                map.flyToBounds(e.target.getBounds(), { duration: 0.8, padding: [40, 40] });
+                            }
+                        });
+
                         const opt = document.createElement('option');
                         opt.value = name; opt.text = name;
                         sel.appendChild(opt);
