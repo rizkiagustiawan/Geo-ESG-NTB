@@ -22,6 +22,7 @@ use std::fs;
 
 // Struct input dari Python (Hulu)
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct SiteData {
     site_id: String,
     satellite_ndvi_90: f64,

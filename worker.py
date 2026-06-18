@@ -17,13 +17,17 @@ DB_URL = os.getenv(
 
 def log_audit_worker(site_id, site_raw, site_esg, ground_truth_biomass):
     """Insert audit log ke PostgreSQL dari worker."""
+    # Bbox fallback for geom
+    bbox = [115.80, -9.10, 119.10, -8.10]
+    bbox_geom = f"ST_MakeEnvelope({bbox[0]}, {bbox[1]}, {bbox[2]}, {bbox[3]}, 4326)"
+    
     try:
         conn = psycopg2.connect(DB_URL)
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO audit_logs
-               (site_id, sat_ndvi, ground_biomass, trust_score, biomass, carbon, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            f"""INSERT INTO audit_logs
+               (site_id, sat_ndvi, ground_biomass, trust_score, biomass, carbon, status, geom)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, {bbox_geom})""",
             (
                 site_id,
                 site_raw.get("satellite_ndvi_90"),

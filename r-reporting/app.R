@@ -25,7 +25,13 @@ tryCatch(
   {
     ntb_map <- st_read("../shared_data/batas_ntb.geojson", quiet = TRUE)
     ntb_map <- sf::st_collection_extract(ntb_map, "POLYGON")
-    raw_data <- fromJSON("../shared_data/raw_data.json")
+    
+    # Try fetching from API first, fallback to local file
+    raw_data <- tryCatch({
+      fromJSON("http://localhost:8000/api/audit-history")[1, ]
+    }, error = function(e) {
+      fromJSON("../shared_data/raw_data.json")[1, ]
+    })
 
     map_data <- ntb_map %>%
       filter(ADM2_NAME == raw_data$site_id) %>%
