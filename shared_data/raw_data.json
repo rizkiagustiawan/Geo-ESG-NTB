@@ -1,9 +1,9 @@
 [
     {
         "site_id": "Lombok Barat",
-        "satellite_ndvi_90": 0.59,
-        "radar_vh_db": -15.143,
-        "radar_vv_db": -8.481,
+        "satellite_ndvi_90": 0.681,
+        "radar_vh_db": -15.207,
+        "radar_vv_db": -8.516,
         "alos_hh_db": -7.744,
         "alos_hv_db": -13.72,
         "historical_trend_slope": -0.0105,
@@ -15,12 +15,12 @@
             "2024": 0.583,
             "2025": 0.605
         },
-        "vision_tree_count": 177,
+        "vision_tree_count": 201,
         "biomass_data_source": "REAL \u2014 Fusi 3 Sensor, Time-Series & Vision AI",
         "ground_truth_10": 100.0,
-        "error_margin": 0.56,
-        "estimated_biomass": 43.96,
-        "estimated_carbon": 20.22,
-        "timestamp": "2026-05-23T04:39:11.089455"
+        "error_margin": 0.595,
+        "estimated_biomass": 40.55,
+        "estimated_carbon": 18.65,
+        "timestamp": "2026-06-19T05:45:11.014223"
     }
 ]
