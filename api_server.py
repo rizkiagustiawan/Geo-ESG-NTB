@@ -43,6 +43,12 @@ try:
 except ImportError:
     generate_pdf_report = None
 
+try:
+    from carbon_pricing import calculate_carbon_value, format_carbon_report
+except ImportError:
+    calculate_carbon_value = None
+    format_carbon_report = None
+
 # ─── Config ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SHARED_DATA = os.path.join(BASE_DIR, "shared_data")
@@ -173,10 +179,22 @@ def build_report_markdown(site_id, site_raw, site_esg, ground_truth_biomass):
         else "AUDIT GAGAL — Akurasi Tidak Memenuhi Standar IPCC"
     )
 
+    # Carbon valuation (Indonesia NEK)
+    carbon_section = ""
+    if calculate_carbon_value:
+        audit_flag = site_esg.get("data_integrity_flag", "")
+        audit_status = "AUDIT_PASS" if "AUDIT_PASS" in audit_flag else "AUDIT_WARN" if "AUDIT_WARN" in audit_flag else "AUDIT_FAIL"
+        carbon_val = calculate_carbon_value(
+            estimated_carbon_mg_ha=site_raw.get("estimated_carbon", 0),
+            area_ha=1500,  # Default area, could be parameterized
+            audit_status=audit_status,
+        )
+        carbon_section = format_carbon_report(carbon_val, site_id)
+
     return f"""# GeoESG Audit Report: {site_id}
 
 > **Waktu Audit:** {datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')}
-> **Metodologi:** Random Forest Sensor Fusion (Optik + SAR) — Mitchard et al. (2012)
+> **Metodologi:** XGBoost Sensor Fusion (Optik + SAR) — Zhang et al. (2025)
 > **Standar:** IPCC 2006 Vol 4 Ch 2 & SNI 7724:2011 (Carbon Accounting)
 
 ---
@@ -189,12 +207,13 @@ def build_report_markdown(site_id, site_raw, site_esg, ground_truth_biomass):
 | **NDVI Optik (Sentinel-2)** | {site_raw.get('satellite_ndvi_90', 'N/A')} | Rouse et al. (1974) |
 | **Radar VH (Sentinel-1)** | {site_raw.get('radar_vh_db', 'N/A')} dB | ESA Copernicus |
 | **Radar VV (Sentinel-1)** | {site_raw.get('radar_vv_db', 'N/A')} dB | ESA Copernicus |
-| **Metode Estimasi** | Random Forest (Optik + SAR Fusion) | Saatchi et al. (2011) |
+| **ALOS L-Band HV** | {site_raw.get('alos_hv_db', 'N/A')} dB | JAXA PALSAR-2 |
+| **Metode Estimasi** | XGBoost (Optik + SAR + L-Band Fusion) | Zhang et al. (2025) |
 
 ### 🌱 Estimasi Karbon & Biomassa
 | Parameter | Nilai | Referensi |
 |-----------|-------|-----------|
-| **Above-Ground Biomass (AGB)** | {site_raw.get('estimated_biomass', 'N/A')} Mg/ha | RF Model |
+| **Above-Ground Biomass (AGB)** | {site_raw.get('estimated_biomass', 'N/A')} Mg/ha | XGBoost Model |
 | **Stok Karbon** | {site_raw.get('estimated_carbon', 'N/A')} Mg C/ha | AGB × 0.46 |
 | **Faktor Konversi Karbon** | 0.46 | SNI 7724:2011 |
 
@@ -208,20 +227,22 @@ def build_report_markdown(site_id, site_raw, site_esg, ground_truth_biomass):
 | **IPCC Tier** | {site_esg.get('ipcc_tier', 'N/A')} | IPCC 2006 |
 | **Status** | `{site_esg.get('data_integrity_flag', 'N/A')}` | |
 
+{carbon_section}
+
 > ℹ️ **Catatan Metodologi:**
-> Estimasi biomassa menggunakan Random Forest dengan fusi 5 fitur sensor
-> (Mitchard et al., 2012; Saatchi et al., 2011). Validasi menggunakan
-> Relative Error terhadap data lapangan dengan threshold IPCC 2006:
-> Tier 3 (≤10%), Tier 2 (≤20%), Tier 1 (≤30%).
+> Estimasi biomassa menggunakan XGBoost dengan fusi 5 fitur sensor
+> (Zhang et al., 2025; Wang et al., 2024). Validasi menggunakan
+> Relative Error terhadap data lapangan dengan threshold IPCC 2006.
+> Valuasi karbon mengacu pada Perpres 98/2021 (NEK) dan harga IDXCarbon.
 
 ---
-*Laporan dihasilkan otomatis oleh GeoESG A.E.C.O Pipeline v2.2*
+*Laporan dihasilkan otomatis oleh GeoESG A.E.C.O Pipeline v2.3*
 """
 
 
 def build_metrics_dict(site_raw, site_esg, ground_truth_biomass):
     """Extract standard metrics dict dari pipeline output."""
-    return {
+    metrics = {
         "satellite_ndvi_90": site_raw.get("satellite_ndvi_90"),
         "ground_truth_biomass": ground_truth_biomass,
         "error_margin": site_raw.get("error_margin"),
@@ -236,7 +257,21 @@ def build_metrics_dict(site_raw, site_esg, ground_truth_biomass):
         "historical_ndvi_series": site_raw.get("historical_ndvi_series"),
         "historical_trend_slope": site_raw.get("historical_trend_slope"),
         "ecological_status": site_raw.get("ecological_status"),
+        "vision_tree_count": site_raw.get("vision_tree_count"),
     }
+
+    # Add carbon valuation if available
+    if calculate_carbon_value:
+        audit_flag = site_esg.get("data_integrity_flag", "")
+        audit_status = "AUDIT_PASS" if "AUDIT_PASS" in audit_flag else "AUDIT_WARN" if "AUDIT_WARN" in audit_flag else "AUDIT_FAIL"
+        carbon_val = calculate_carbon_value(
+            estimated_carbon_mg_ha=site_raw.get("estimated_carbon", 0),
+            area_ha=1500,
+            audit_status=audit_status,
+        )
+        metrics["carbon_value"] = carbon_val
+
+    return metrics
 
 
 
