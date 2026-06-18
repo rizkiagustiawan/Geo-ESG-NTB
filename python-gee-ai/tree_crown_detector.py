@@ -23,6 +23,13 @@ import os
 import cv2
 import numpy as np
 
+# Try to import DL detector
+try:
+    from tree_crown_dl import DeepTreeCrownDetector
+    HAS_DL = True
+except ImportError:
+    HAS_DL = False
+
 
 class TreeCrownDetector:
     """
@@ -88,24 +95,23 @@ class TreeCrownDetector:
 
     def detect_tree_crowns(self, image_path, site_id):
         """
-        Deteksi tajuk pohon menggunakan Classical Computer Vision.
+        Deteksi tajuk pohon — DL (primary) → Classical CV (fallback).
 
-        Pipeline:
-          1. Konversi BGR → HSV color space
-          2. Masking warna hijau (chlorophyll range)
-          3. Morphological opening (noise removal + crown separation)
-          4. Contour detection (instance identification)
-          5. Area filtering (min 50px² untuk menghilangkan noise)
-
-        Metode ini mengikuti review di Ke & Quackenbush (2011).
-
-        Args:
-            image_path: Path ke citra input (RGB)
-            site_id: Nama lokasi
-
-        Returns:
-            tuple: (tree_count, result_image_path)
+        References:
+          - DL: Brandt et al. (2025), Nature Reviews Earth & Env
+          - Classical: Ke & Quackenbush (2011), Int. J. Remote Sensing
         """
+        # Try DL first
+        if HAS_DL:
+            try:
+                dl_detector = DeepTreeCrownDetector()
+                count, path = dl_detector.detect_tree_crowns_dl(image_path, site_id)
+                if count > 0:
+                    return count, path
+            except Exception as e:
+                print(f"DL detection failed, falling back to CV: {e}")
+
+        # Classical CV fallback (original method)
         img = cv2.imread(image_path)
         if img is None:
             return 0, None
