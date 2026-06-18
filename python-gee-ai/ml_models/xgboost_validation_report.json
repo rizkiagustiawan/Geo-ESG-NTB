@@ -1,0 +1,38 @@
+{
+  "model": "XGBRegressor",
+  "n_estimators": 300,
+  "max_depth": 8,
+  "learning_rate": 0.05,
+  "n_training_samples": 8000,
+  "n_test_samples": 2000,
+  "training_data_source": "Science-based synthetic (Mitchard 2012; Saatchi 2011) + interaction terms",
+  "validation_metrics": {
+    "R2": 0.8685,
+    "RMSE_Mg_ha": 13.54,
+    "MAE_Mg_ha": 8.29,
+    "Bias_Mg_ha": 0.44,
+    "Mean_RE_pct": 21.6,
+    "CV_5fold_R2_mean": 0.8744,
+    "CV_5fold_R2_std": 0.0107
+  },
+  "baseline_comparison": {
+    "RF_R2": 0.8906,
+    "RF_RMSE": 13.97,
+    "RF_RE_pct": 19.3,
+    "improvement_R2": -0.0221,
+    "improvement_RMSE": 0.43
+  },
+  "feature_importance": {
+    "NDVI": 0.2884,
+    "S1-VH": 0.1651,
+    "S1-VV": 0.0305,
+    "ALOS-HH": 0.0589,
+    "ALOS-HV": 0.4572
+  },
+  "references": [
+    "Zhang et al. (2025) IEEE JSTARS \u2014 AutoML + multi-sensor fusion",
+    "Wang et al. (2024) Forests 15:1576 \u2014 S1/S2/ALOS/GEDI comparison",
+    "Zurqani (2025) Ecological Informatics \u2014 GEDI + GEE + ML",
+    "Mitchard et al. (2012) Remote Sens. Environ. 124:587-598"
+  ]
+}
